@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# raw/processed datasets and python pipeline venv (large, not for git)
+/data/
+/pipeline/.venv/
+__pycache__/
+*.pyc
