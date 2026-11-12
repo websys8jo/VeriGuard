@@ -56,6 +56,10 @@ def main():
     texts_df = pd.read_csv(OUT / "dna_texts.csv")
     upsert("texts", texts_df)
 
+    prosocial_path = OUT / "prosocial_texts.csv"
+    if prosocial_path.exists():
+        upsert("texts", pd.read_csv(prosocial_path))
+
 
 if __name__ == "__main__":
     main()
