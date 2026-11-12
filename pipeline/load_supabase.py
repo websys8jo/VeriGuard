@@ -2,6 +2,7 @@
 
 Usage: pipeline/.venv/Scripts/python.exe pipeline/load_supabase.py
 """
+import json
 import math
 import os
 from pathlib import Path
@@ -25,14 +26,16 @@ HEADERS = {
 OUT = Path("data/processed")
 
 
-def clean(value):
+def clean(key, value):
     if isinstance(value, float) and math.isnan(value):
         return None
+    if key == "examples" and isinstance(value, str):
+        return json.loads(value)
     return value
 
 
 def upsert(table: str, df: pd.DataFrame, batch_size: int = 500):
-    records = [{k: clean(v) for k, v in row.items()} for row in df.to_dict(orient="records")]
+    records = [{k: clean(k, v) for k, v in row.items()} for row in df.to_dict(orient="records")]
     n_batches = math.ceil(len(records) / batch_size)
     for i in range(n_batches):
         batch = records[i * batch_size : (i + 1) * batch_size]
@@ -59,6 +62,11 @@ def main():
     prosocial_path = OUT / "prosocial_texts.csv"
     if prosocial_path.exists():
         upsert("texts", pd.read_csv(prosocial_path))
+
+    jigsaw_rules_path = OUT / "jigsaw_rules.csv"
+    if jigsaw_rules_path.exists():
+        upsert("rules", pd.read_csv(jigsaw_rules_path))
+        upsert("texts", pd.read_csv(OUT / "jigsaw_texts.csv"))
 
 
 if __name__ == "__main__":
