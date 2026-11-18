@@ -1,0 +1,54 @@
+{
+  "model": "google/shieldgemma-2b",
+  "dtype": "float16",
+  "attn_implementation": "eager",
+  "batch_size": 8,
+  "padding_side": "left",
+  "max_tokens": 2048,
+  "truncation": "context oldest-first, judged text never truncated (0 prompts truncated)",
+  "template": "tokenizer.apply_chat_template (official ShieldGemma chat template), guideline = '\"<rule name>\": <rule text>'",
+  "rule_text_split": "rule_text split at first ':' into name/description; 8 DNA minor rules without ':' use full text for both",
+  "dna_template": "response (user=question/context, assistant=raw_text)",
+  "jigsaw_template": "prompt-only (user=comment raw_text)",
+  "violation_prob": "softmax([logit_Yes, logit_No])[0] at last position",
+  "yes_token_id": 3553,
+  "no_token_id": 1294,
+  "default_condition": "DNA: top-5 minor rules by dna_similarity.csv; Jigsaw: both minor rules (major node excluded)",
+  "rule_sentence_only": "gold_rule_id",
+  "dedup": "same (text_id, rule_id) prompt computed once and shared across conditions; 34,460 forward passes",
+  "model_output": "Yes if violation_prob >= 0.5 else No",
+  "fp16_check": "20 dev texts: max |fp32 - fp16| = 0.004399, no NaN; left-padding batch vs single diff = 0.000002",
+  "rows": {
+    "judgments_shieldgemma_dna.csv": 33804,
+    "judgments_shieldgemma_jigsaw.csv": 6087
+  },
+  "sanity_dev_rule_sentence_only": {
+    "dna": {
+      "n": 4464,
+      "violations": 154,
+      "roc_auc": 0.68,
+      "mean_prob_violation": 0.27,
+      "mean_prob_normal": 0.066
+    },
+    "jigsaw": {
+      "n": 1619,
+      "violations": 821,
+      "roc_auc": 0.714,
+      "mean_prob_violation": 0.371,
+      "mean_prob_normal": 0.223
+    }
+  },
+  "inputs": {
+    "shared_inputs_commit": "4b23b3b961b1aee9cf784ffe087fb24075a72029",
+    "dna_similarity_commit": "8e2cc5d66aeb316f791301e938c2c92d07a0066d (PR #1)",
+    "split_source": "splits.csv"
+  },
+  "versions": {
+    "transformers": "5.20.2",
+    "torch": "not recorded (Kaggle default image, 2026-11-18)",
+    "python": "not recorded (Kaggle default image, 2026-11-18)"
+  },
+  "gpu": "Tesla T4 (Kaggle)",
+  "run_date": "2026-11-18",
+  "kaggle_notebook": "veriguard-shieldgemma (Quick Save: ShieldGemma DNA Jigsaw 1차)"
+}
