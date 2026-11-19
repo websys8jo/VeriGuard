@@ -80,12 +80,19 @@ export function useTauGrid() {
   return useFetch<TauGridRow[]>("/api/p1/tau-grid");
 }
 
-export function useTexts(params: { source?: string; split?: string; goldRuleId?: string | null; q?: string }) {
+export function useTexts(params: {
+  source?: string;
+  split?: string;
+  goldRuleId?: string | null;
+  q?: string;
+  limit?: number;
+}) {
   const qs = new URLSearchParams();
   if (params.source) qs.set("source", params.source);
   if (params.split) qs.set("split", params.split);
   if (params.goldRuleId) qs.set("gold_rule_id", params.goldRuleId);
   if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
   return useFetch<TextListItem[]>(`/api/p1/texts?${qs.toString()}`);
 }
 
@@ -99,4 +106,10 @@ export function useNodeStats(tau: number) {
 
 export function useBoundaryCases(tau: number) {
   return useFetch<BoundaryCase[]>(`/api/p1/boundary-cases?tau=${tau}`);
+}
+
+export function useRuleTexts(ruleId: string | null, tau: number) {
+  return useFetch<{ tau: number; texts: TextListItem[] }>(
+    ruleId ? `/api/p1/rule-texts?rule_id=${encodeURIComponent(ruleId)}&tau=${tau}` : null,
+  );
 }

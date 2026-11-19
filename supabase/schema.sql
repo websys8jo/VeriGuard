@@ -99,6 +99,19 @@ create table if not exists p1_node_stats (
   unique (tau, rule_id)
 );
 
+-- Which rule BFS actually lands on for every text at each grid tau, so clicking
+-- a rule node can list "texts BFS retrieved this rule for" (not just "texts
+-- whose gold rule is this"). One row per (tau, text_id).
+create table if not exists p1_rule_texts (
+  id bigserial primary key,
+  tau double precision not null,
+  rule_id text not null references rules(id) on delete cascade,
+  text_id text not null references texts(id) on delete cascade,
+  unique (tau, text_id)
+);
+
+create index if not exists p1_rule_texts_lookup_idx on p1_rule_texts(tau, rule_id);
+
 -- Texts where the BFS-found rule changes between two adjacent grid tau values
 -- ("경계 사례": nudging tau slightly flips the outcome).
 create table if not exists p1_boundary_cases (

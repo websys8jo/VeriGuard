@@ -17,6 +17,7 @@ Usage: pipeline/.venv/Scripts/python.exe pipeline/precompute_p1.py
 """
 import math
 import os
+import time
 from pathlib import Path
 
 import requests
@@ -31,17 +32,33 @@ HEADERS = {"apikey": SERVICE_KEY, "Authorization": f"Bearer {SERVICE_KEY}"}
 TAU_GRID = [round(i * 0.02, 2) for i in range(31)]  # 0.00 .. 0.60
 
 
-def fetch_all(table: str, select: str, filters: str = "", page_size: int = 1000) -> list[dict]:
+def fetch_all(
+    table: str, select: str, filters: str = "", page_size: int = 1000, order_by: str = "id"
+) -> list[dict]:
+    # Without an explicit order, Range-based pagination across separate requests
+    # has no guaranteed row ordering -- pages can overlap/repeat and other rows
+    # never get served at all. This is exactly what silently dropped every
+    # Jigsaw text/rule from earlier runs: unordered pages kept re-serving DNA
+    # rows up to the total row count, so counts looked right but content wasn't.
     rows = []
     start = 0
     while True:
-        url = f"{SUPABASE_URL}/rest/v1/{table}?select={select}{filters}"
-        resp = requests.get(
-            url,
-            headers={**HEADERS, "Range-Unit": "items", "Range": f"{start}-{start + page_size - 1}"},
-            timeout=60,
-        )
-        resp.raise_for_status()
+        url = f"{SUPABASE_URL}/rest/v1/{table}?select={select}{filters}&order={order_by}.asc"
+        for attempt in range(5):
+            try:
+                resp = requests.get(
+                    url,
+                    headers={**HEADERS, "Range-Unit": "items", "Range": f"{start}-{start + page_size - 1}"},
+                    timeout=60,
+                )
+                resp.raise_for_status()
+                break
+            except (requests.exceptions.RequestException,) as e:
+                if attempt == 4:
+                    raise
+                wait = 2**attempt
+                print(f"  ...{table} page at {start} failed ({e}), retrying in {wait}s")
+                time.sleep(wait)
         batch = resp.json()
         rows.extend(batch)
         if len(batch) < page_size:
@@ -96,17 +113,43 @@ def run_bfs(sim_for_text: dict, rules_by_parent: dict, source: str, tau: float):
     return path, nodes_visited, final_candidates
 
 
+def _request_with_retry(method: str, url: str, **kwargs):
+    for attempt in range(5):
+        try:
+            return requests.request(method, url, timeout=60, **kwargs)
+        except requests.exceptions.RequestException as e:
+            if attempt == 4:
+                raise
+            wait = 2**attempt
+            print(f"  ...{method} {url} failed ({e}), retrying in {wait}s")
+            time.sleep(wait)
+
+
+def delete_all(table: str):
+    """This script always does a full rebuild, and p1_boundary_cases has no
+    unique constraint to upsert against anyway, so clear each table first
+    instead of fiddling with on_conflict targets."""
+    resp = _request_with_retry(
+        "DELETE",
+        f"{SUPABASE_URL}/rest/v1/{table}",
+        headers={**HEADERS, "Prefer": "return=minimal"},
+        params={"id": "gte.0"},
+    )
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(f"delete {table}: HTTP {resp.status_code} {resp.text[:300]}")
+
+
 def upsert(table: str, records: list[dict], batch_size: int = 1000):
     if not records:
         return
     n_batches = math.ceil(len(records) / batch_size)
     for i in range(n_batches):
         batch = records[i * batch_size : (i + 1) * batch_size]
-        resp = requests.post(
+        resp = _request_with_retry(
+            "POST",
             f"{SUPABASE_URL}/rest/v1/{table}",
-            headers={**HEADERS, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"},
+            headers={**HEADERS, "Content-Type": "application/json"},
             json=batch,
-            timeout=60,
         )
         if resp.status_code not in (200, 201):
             raise RuntimeError(f"{table} batch {i}: HTTP {resp.status_code} {resp.text[:300]}")
@@ -208,7 +251,19 @@ def main():
             prev_tau, prev_leaf = tau, leaf
     print(f"  {len(boundary_rows)} boundary flips found")
 
+    rule_texts_rows = [
+        {"tau": tau, "rule_id": leaf, "text_id": text_id}
+        for text_id, by_tau in found_by_text_tau.items()
+        for tau, leaf in by_tau.items()
+    ]
+    print(f"  {len(rule_texts_rows)} (tau, text) -> found-rule assignments")
+
+    print("clearing old rows (full rebuild each run)...")
+    for table in ["p1_rule_texts", "p1_tau_grid", "p1_node_stats", "p1_boundary_cases"]:
+        delete_all(table)
+
     print("uploading...")
+    upsert("p1_rule_texts", rule_texts_rows)
     upsert("p1_tau_grid", tau_grid_rows)
     upsert("p1_node_stats", node_stats_rows)
     upsert("p1_boundary_cases", boundary_rows)

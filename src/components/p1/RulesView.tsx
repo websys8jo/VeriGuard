@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { useBoundaryCases, useNodeStats, useRules, useTauGrid } from "@/lib/rules/useP1Data";
 import { RuleTree } from "./RuleTree";
+import { RuleNodePanel } from "./RuleNodePanel";
 import { TauSlider } from "./TauSlider";
 import { TextPicker } from "./TextPicker";
 import { TextDetail } from "./TextDetail";
@@ -80,6 +81,20 @@ export function RulesView() {
             selectedRuleId={filters.ruleId}
           />
         </div>
+
+        {filters.ruleId &&
+          (() => {
+            const selectedRule = rules.find((r) => r.id === filters.ruleId);
+            if (!selectedRule) return null;
+            return (
+              <RuleNodePanel
+                rule={selectedRule}
+                tau={tau}
+                onClose={() => setFilters({ ruleId: null })}
+                onSelectText={setSelectedTextId}
+              />
+            );
+          })()}
 
         {boundaryCases && boundaryCases.length > 0 && (
           <div className="rounded border border-amber-200 p-2 text-xs dark:border-amber-900">
