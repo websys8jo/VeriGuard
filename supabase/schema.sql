@@ -30,6 +30,18 @@ create table if not exists texts (
 create index if not exists texts_source_split_idx on texts(source, split);
 create index if not exists texts_gold_rule_idx on texts(gold_rule_id);
 
+-- 2D projection (e.g. UMAP over all-roberta-large-v1 embeddings) for an
+-- embedding-map view; one row per text, source/split denormalized for
+-- filtering without a join.
+create table if not exists text_coords (
+  text_id text primary key references texts(id) on delete cascade,
+  source text not null,
+  split text not null,
+  x double precision not null,
+  y double precision not null,
+  projection_method text not null
+);
+
 -- ---------------------------------------------------------------------
 -- P1: rule-finding (BFS) support
 -- ---------------------------------------------------------------------
