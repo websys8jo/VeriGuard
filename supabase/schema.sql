@@ -60,13 +60,57 @@ create index if not exists similarity_steps_rule_idx on similarity_steps(rule_id
 
 create table if not exists bfs_runs (
   text_id text primary key references texts(id) on delete cascade,
-  bfs_path jsonb not null,       -- ordered array of rule ids actually visited
+  bfs_path jsonb not null,        -- retrieved_rule_path: one node per level reached
+  visited_rule_ids jsonb not null, -- every rule id whose similarity was compared
   gold_path jsonb,                -- ordered array of rule ids on the answer path
   diverge_level text check (diverge_level in ('major', 'mid', 'minor')), -- null = matched
   nodes_visited int not null,
   total_nodes int not null,
   tau_used double precision not null
 );
+
+alter table bfs_runs add column if not exists visited_rule_ids jsonb not null default '[]';
+
+-- Aggregate P1 metrics precomputed over a tau grid (0.00-0.60 step 0.02), since
+-- recomputing BFS for all ~7,663 DNA+Jigsaw texts from 443k similarity rows on
+-- every slider tick isn't practical client-side. The tau slider snaps to the
+-- nearest grid value for these three; per-text BFS (bfs_runs above, or live
+-- recompute from similarity_steps) stays exact for any tau.
+create table if not exists p1_tau_grid (
+  id bigserial primary key,
+  tau double precision not null,
+  source text not null check (source in ('dna', 'jigsaw')),
+  split text not null check (split in ('dev', 'test')),
+  topk1_acc double precision not null,
+  topk3_acc double precision not null,
+  efficiency double precision not null, -- avg(nodes_visited / total_nodes)
+  n int not null,
+  unique (tau, source, split)
+);
+
+-- Per-rule top-1 accuracy at each grid tau, for the P1 aggregate tree view
+-- ("자주 틀리는 가지가 보이도록 강조").
+create table if not exists p1_node_stats (
+  id bigserial primary key,
+  tau double precision not null,
+  rule_id text not null references rules(id) on delete cascade,
+  n_gold int not null,     -- texts whose gold_rule_id is this rule
+  n_correct int not null,  -- of those, how many BFS found == this rule at this tau
+  unique (tau, rule_id)
+);
+
+-- Texts where the BFS-found rule changes between two adjacent grid tau values
+-- ("경계 사례": nudging tau slightly flips the outcome).
+create table if not exists p1_boundary_cases (
+  id bigserial primary key,
+  text_id text not null references texts(id) on delete cascade,
+  tau_low double precision not null,
+  tau_high double precision not null,
+  rule_id_low text references rules(id),
+  rule_id_high text references rules(id)
+);
+
+create index if not exists p1_boundary_cases_text_idx on p1_boundary_cases(text_id);
 
 -- ---------------------------------------------------------------------
 -- P2: judgment comparison

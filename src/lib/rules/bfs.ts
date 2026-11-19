@@ -11,6 +11,8 @@ export interface BfsResult {
   path: RuleNode[];
   /** ranked candidates at the deepest level BFS reached, used for top-k accuracy */
   finalCandidates: { node: RuleNode; score: number }[];
+  /** every rule id whose similarity was actually compared, across all levels visited */
+  visitedRuleIds: string[];
   nodesVisited: number;
   totalNodes: number;
 }
@@ -32,11 +34,13 @@ export function runBfs(
 
   let frontier = rootsOf(allRules, source);
   const path: RuleNode[] = [];
+  const visitedRuleIds: string[] = [];
   let nodesVisited = 0;
   let finalCandidates: { node: RuleNode; score: number }[] = [];
 
   while (frontier.length > 0) {
     nodesVisited += frontier.length;
+    visitedRuleIds.push(...frontier.map((n) => n.id));
     const scored = frontier
       .map((node) => ({ node, score: scoreOf.get(node.id) ?? -Infinity }))
       .sort((a, b) => b.score - a.score);
@@ -61,7 +65,7 @@ export function runBfs(
     frontier = children;
   }
 
-  return { path, finalCandidates, nodesVisited, totalNodes };
+  return { path, finalCandidates, visitedRuleIds, nodesVisited, totalNodes };
 }
 
 export interface DivergeInfo {
