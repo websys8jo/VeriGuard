@@ -39,8 +39,32 @@ P1 BFS(대→중→소 계층 탐색, τ 통과 노드만 하위로 내려감)�
 | 일부만 포함 | 374 | 6.6% |
 | 하나도 안 겹침 | 8 | 0.1% |
 
-→ **DNA 텍스트 8건만 ShieldGemma 추가 판정이 필요**하고, 나머지 99.9%는 기존 확률을 BFS 결과로 재필터링하면 됩니다. 이 8건의 text_id는 필요하면 추가로 뽑아드릴 수 있습니다.
+→ **DNA 텍스트 8건만 ShieldGemma 추가 판정이 필요**하고, 나머지 99.9%는 기존 확률을 BFS 결과로 재필터링하면 됩니다.
+
+## DNA: ShieldGemma 기존 5개 후보별 BFS 통과 여부 (`p2_shieldgemma_bfs_dna.csv`)
+
+28,170행 (5,634텍스트 × 5후보). 컬럼: `text_id, rule_id, shieldgemma_violation_prob, bfs_pass, is_fallback, fallback_rule_id`
+
+- `bfs_pass`: 이 rule_id가 실제 BFS 결과(생존자 집합, fallback이면 유사도 1위 1개)에 포함되는지
+- `is_fallback`: 이 텍스트가 어느 단계에서도 τ를 통과한 노드가 없어 "유사도 1위로 대체"된 경우인지
+- `fallback_rule_id`: `is_fallback=True`일 때 그 대체 규칙의 id (대/중/소 어느 레벨이든 될 수 있음 — 아래 참고)
+
+**사용법**: `bfs_pass=True`인 행들 중 `shieldgemma_violation_prob` 최댓값 = 그 텍스트의 default 최종 확률. `bfs_pass=True`가 하나도 없으면 `p2_dna_needs_shieldgemma_rerun.csv` 참고.
+
+## DNA: 추가 판정 필요한 8건 (`p2_dna_needs_shieldgemma_rerun.csv`)
+
+기존 5개 후보 중 BFS를 통과한 게 하나도 없는 텍스트입니다.
+
+- 6건은 소분류 레벨에서 막힘 (`is_fallback=False`, `fallback_rule_id` 비어있음) — 실제 BFS 생존자가 기존 5개와 안 겹치는 경우. `p2_candidates_dna.csv`에서 이 text_id로 찾으면 진짜 생존자 목록이 있습니다.
+- **2건은 대분류·중분류에서 아예 막힘** (`dna__921__ChatGPT`→대분류 `dna_major_0624bbb8aa`, `dna__921__GPT4`→중분류 `dna_mid_b419714480`) — `fallback_rule_id`가 **소분류가 아니라 대/중분류 문장**입니다. ShieldGemma 정책 자리에 소분류보다 훨씬 포괄적인 문장이 들어가게 되는데, 이게 의도한 입력 형식이 맞는지 확인 한번 부탁드립니다.
+
+## Jigsaw id 매핑 (`jigsaw_id_mapping.csv`)
+
+```
+jigsaw_minor_560931914f54  →  jigsaw_rule_560931914f   ("No legal advice: Do not offer or request legal advice.")
+jigsaw_minor_677797f76c2c  →  jigsaw_rule_677797f76c   ("No Advertising: Spam, referral links, unsolicited advertising, and promotional content are not allowed.")
+```
 
 ## 생성 방법
 
-`pipeline/generate_p2_candidates.py` — BFS 로직은 `pipeline/precompute_p1.py`의 `run_bfs`와 동일(같은 코드 재사용).
+`pipeline/generate_p2_candidates.py`, `pipeline/generate_shieldgemma_bfs_annotation.py` — BFS 로직은 `pipeline/precompute_p1.py`의 `run_bfs`와 동일(같은 코드 재사용).

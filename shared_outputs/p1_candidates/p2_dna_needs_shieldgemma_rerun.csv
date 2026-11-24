@@ -1,0 +1,9 @@
+text_id,fallback_rule_id,is_fallback
+dna__795__Claude,,False
+dna__878__ChatGPT,,False
+dna__878__llama2-7b-chat,,False
+dna__885__ChatGPT,,False
+dna__890__ChatGLM2,,False
+dna__919__vicuna-7b,,False
+dna__921__ChatGPT,dna_major_0624bbb8aa,True
+dna__921__GPT4,dna_mid_b419714480,True

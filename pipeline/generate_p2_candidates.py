@@ -40,7 +40,7 @@ def main():
                     continue
                 n_texts += 1
                 sim_for_text = sim_by_text.get(t["id"], {})
-                _, _, final_candidates = run_bfs(sim_for_text, rules_by_parent, source, TAU)
+                _, _, final_candidates, _is_fallback = run_bfs(sim_for_text, rules_by_parent, source, TAU)
                 for rule, score in final_candidates:
                     writer.writerow([t["id"], rule["id"], score, TAU])
         print(f"{out_path}: {n_texts} texts")

@@ -78,12 +78,19 @@ def roots_of(rules_by_parent: dict, source: str, rules_by_id: dict) -> list[dict
 
 
 def run_bfs(sim_for_text: dict, rules_by_parent: dict, source: str, tau: float):
-    """Returns (path_ids: list[str], nodes_visited: int, final_candidates: list[(rule_id, score)])"""
+    """Returns (path_ids, nodes_visited, final_candidates: list[(rule, score)], is_fallback).
+
+    is_fallback=True means no node survived tau at the level where the search
+    stopped, so final_candidates is the full ranked list at that level (not
+    real survivors) -- per spec, the single fallback pick is final_candidates[0]
+    (highest similarity), not the whole list.
+    """
     frontier = rules_by_parent.get(None, [])
     frontier = [r for r in frontier if r["source"] == source]
     path = []
     nodes_visited = 0
     final_candidates = []
+    is_fallback = False
 
     while frontier:
         nodes_visited += len(frontier)
@@ -96,6 +103,7 @@ def run_bfs(sim_for_text: dict, rules_by_parent: dict, source: str, tau: float):
         if not survivors:
             path.append(scored[0][0]["id"])
             final_candidates = scored
+            is_fallback = True
             break
 
         path.append(survivors[0][0]["id"])
@@ -105,12 +113,13 @@ def run_bfs(sim_for_text: dict, rules_by_parent: dict, source: str, tau: float):
 
         if not children:
             final_candidates = survivors
+            is_fallback = False
             break
 
         final_candidates = survivors
         frontier = children
 
-    return path, nodes_visited, final_candidates
+    return path, nodes_visited, final_candidates, is_fallback
 
 
 def _request_with_retry(method: str, url: str, **kwargs):
@@ -193,7 +202,7 @@ def main():
         for t in texts:
             source, split, gold = t["source"], t["split"], t["gold_rule_id"]
             sim_for_text = sim_by_text.get(t["id"], {})
-            path, visited, final_candidates = run_bfs(sim_for_text, rules_by_parent, source, tau)
+            path, visited, final_candidates, _is_fallback = run_bfs(sim_for_text, rules_by_parent, source, tau)
             found_leaf = path[-1]
             found_by_text_tau[t["id"]][tau] = found_leaf
 
