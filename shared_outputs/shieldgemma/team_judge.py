@@ -38,10 +38,15 @@ def load_jobs(input_dir, source, split, limit):
     return jobs
 
 
-def policies(rule_text, variant):
+def original_policy(rule_text):
     name, sep, description = " ".join(rule_text.split()).partition(":")
     description = description.strip() if sep else name
     original = f'"{name.strip()}": {description}'
+    return name.strip(), original
+
+
+def policies(rule_text, variant):
+    name, original = original_policy(rule_text)
     examples = variant.get("examples", [])
     revised = variant.get("revised_rule")
     if (
@@ -72,6 +77,37 @@ def prepare_jobs(jobs, variants):
         (row, policies(row.rule_text, variants[row.rule_id]))
         for row in jobs.itertuples(index=False)
     ]
+
+
+def prepare_excluded_jobs(jobs, input_dir, source, similarity_path):
+    rules = pd.read_csv(input_dir / f"{source}_rules.csv").query("level == 'minor'")
+    policies_by_id = {row.id: original_policy(row.rule_text)[1]
+                      for row in rules.itertuples(index=False)}
+    similarity = pd.read_csv(similarity_path, usecols=["text_id", "rule_id", "similarity"])
+    similarity = similarity[
+        similarity["text_id"].isin(jobs["text_id"])
+        & similarity["rule_id"].isin(policies_by_id)
+    ]
+    if similarity.duplicated(["text_id", "rule_id"]).any() or similarity["similarity"].isna().any():
+        raise ValueError("Duplicate candidates or missing similarity scores")
+    top_five = (
+        similarity.sort_values(["text_id", "similarity"], ascending=[True, False])
+        .groupby("text_id").head(5)
+    )
+    candidates = top_five.groupby("text_id")["rule_id"].agg(list).to_dict()
+    prepared = []
+    for row in jobs.itertuples(index=False):
+        rule_ids = candidates.get(row.text_id, [])
+        if len(rule_ids) != min(5, len(policies_by_id)):
+            raise ValueError(f"{row.text_id}: incomplete top-five candidates")
+        alternatives = [rule_id for rule_id in rule_ids if rule_id != row.rule_id]
+        if not alternatives:
+            raise ValueError(f"{row.text_id}: no candidate remains after gold rule exclusion")
+        prepared.extend(
+            (row._replace(rule_id=rule_id), (policies_by_id[rule_id],))
+            for rule_id in alternatives
+        )
+    return prepared
 
 
 def encode(tokenizer, prompts):
@@ -105,7 +141,7 @@ def build_prompts(tokenizer, row, guidelines):
         context = context[len(context) // 10 + 1:]
 
 
-def run(jobs, output, revision):
+def run(jobs, output, revision, conditions):
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -124,7 +160,7 @@ def run(jobs, output, revision):
     pending = [
         (row, condition, prompt)
         for row, guidelines in jobs
-        for condition, prompt in zip(CONDITIONS, build_prompts(tokenizer, row, guidelines), strict=True)
+        for condition, prompt in zip(conditions, build_prompts(tokenizer, row, guidelines), strict=True)
     ]
     results = []
     with torch.inference_mode():
@@ -149,7 +185,10 @@ def run(jobs, output, revision):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--inputs", type=Path, default=Path("shared_inputs/rule_similarity"))
-    parser.add_argument("--variants", type=Path, required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--variants", type=Path)
+    mode.add_argument("--rule-excluded", action="store_true")
+    parser.add_argument("--similarity", type=Path, help="Full similarity CSV for --rule-excluded")
     parser.add_argument("--source", choices=("dna", "jigsaw"), required=True)
     parser.add_argument("--split", choices=("dev", "test"), default="dev")
     parser.add_argument("--limit", type=int)
@@ -159,20 +198,28 @@ def main():
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be positive")
-    jobs = load_jobs(args.inputs, args.source, args.split, args.limit)
-    variants = json.loads(args.variants.read_text(encoding="utf-8"))
-    if not isinstance(variants, dict) or any(not isinstance(value, dict) for value in variants.values()):
-        parser.error("--variants must contain a JSON object keyed by rule ID")
+    if args.rule_excluded and args.similarity is None:
+        parser.error("--rule-excluded requires --similarity")
     try:
-        prepared = prepare_jobs(jobs, variants)
+        jobs = load_jobs(args.inputs, args.source, args.split, args.limit)
+        if args.rule_excluded:
+            conditions = ("rule_excluded",)
+            prepared = prepare_excluded_jobs(jobs, args.inputs, args.source, args.similarity)
+        else:
+            conditions = CONDITIONS
+            variants = json.loads(args.variants.read_text(encoding="utf-8"))
+            if not isinstance(variants, dict) or any(not isinstance(value, dict) for value in variants.values()):
+                parser.error("--variants must contain a JSON object keyed by rule ID")
+            prepared = prepare_jobs(jobs, variants)
     except ValueError as error:
         parser.error(str(error))
     if args.dry_run:
-        print(f"{len(prepared)} pairs × {len(CONDITIONS)} conditions = {len(prepared) * len(CONDITIONS)} rows")
+        print(f"{len(jobs)} texts, {len(prepared)} pairs × {len(conditions)} conditions"
+              f" = {len(prepared) * len(conditions)} rows")
         return
     if args.output.exists():
         parser.error(f"Output already exists: {args.output}")
-    run(prepared, args.output, args.revision)
+    run(prepared, args.output, args.revision, conditions)
 
 
 if __name__ == "__main__":
