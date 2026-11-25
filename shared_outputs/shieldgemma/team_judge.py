@@ -138,7 +138,7 @@ def run(jobs, output, revision):
                 if not math.isfinite(score) or not 0 <= score <= 1:
                     raise ValueError(f"{row.text_id} / {condition}: invalid probability")
                 results.append((
-                    row.text_id, row.source, row.split, "shieldgemma_2b", condition,
+                    row.text_id, row.source, row.split, "team_shieldgemma_2b", condition,
                     row.rule_id, score, "Yes" if score >= 0.5 else "No", row.human_label,
                 ))
     output.parent.mkdir(parents=True, exist_ok=True)
