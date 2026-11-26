@@ -150,7 +150,9 @@ export function ModelScatterPanel({ source, split, ruleId, selectedTextId, onSel
                       name={label}
                       data={grouped[label]}
                       fill={POINT_COLOR[label]}
-                      fillOpacity={0.65}
+                      fillOpacity={0.7}
+                      animationDuration={500}
+                      animationEasing="ease-out"
                       onClick={(p) => onSelectText((p as unknown as Point).textId)}
                       cursor="pointer"
                     />

@@ -1,8 +1,10 @@
 "use client";
 
-import { BASELINE_MODELS, MODEL_SHORT_LABELS, type ModelName } from "@/lib/p2/models";
-import { kappaLabel, kappaTier, STATUS_STYLE } from "@/lib/p2/statusTier";
+import { motion } from "framer-motion";
+import { BASELINE_MODELS, MODEL_SHORT_LABELS } from "@/lib/p2/models";
+import { kappaLabel } from "@/lib/p2/statusTier";
 import type { KappaResponse } from "@/lib/p2/useP2Data";
+import { Heatmap, HeatmapLegend, type HeatCell } from "./Heatmap";
 
 export function KappaPanel({ kappa }: { kappa: KappaResponse }) {
   const byPair = new Map<string, number>();
@@ -13,8 +15,27 @@ export function KappaPanel({ kappa }: { kappa: KappaResponse }) {
   }
   const anyData = byPair.size > 0;
 
+  const nodes = BASELINE_MODELS.map((m) => ({ id: m, label: MODEL_SHORT_LABELS[m] }));
+  const order = BASELINE_MODELS;
+
+  function cell(a: string, b: string): HeatCell | undefined {
+    const k = byPair.get(`${a}\u0000${b}`);
+    if (k === undefined) return { value: null, display: "–" };
+    const normalized = Math.max(0, Math.min(1, k));
+    return {
+      value: normalized,
+      display: k.toFixed(2),
+      title: `κ=${k.toFixed(3)} · ${kappaLabel(k)}`,
+    };
+  }
+
   return (
-    <div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.1 }}
+      className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800"
+    >
       <div className="mb-2 flex items-center justify-between text-xs">
         <span className="font-medium">모델 간 일치도 (Cohen&apos;s κ)</span>
         {!kappa.cached && <span className="text-[10px] text-neutral-400">실시간 계산</span>}
@@ -27,56 +48,20 @@ export function KappaPanel({ kappa }: { kappa: KappaResponse }) {
           (team_judge 준비 중)
         </div>
       ) : (
-        <div
-          className="grid gap-px"
-          style={{ gridTemplateColumns: `72px repeat(${BASELINE_MODELS.length}, minmax(0, 1fr))` }}
-        >
-          <div />
-          {BASELINE_MODELS.map((m) => (
-            <div key={m} className="px-0.5 pb-1 text-center text-[9px] leading-tight text-neutral-500 dark:text-neutral-400">
-              {MODEL_SHORT_LABELS[m]}
-            </div>
-          ))}
-          {BASELINE_MODELS.map((rowModel) => (
-            <RowCells key={rowModel} rowModel={rowModel} byPair={byPair} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RowCells({ rowModel, byPair }: { rowModel: ModelName; byPair: Map<string, number> }) {
-  return (
-    <>
-      <div className="flex items-center pr-1 text-[10px] text-neutral-500 dark:text-neutral-400">
-        {MODEL_SHORT_LABELS[rowModel]}
-      </div>
-      {BASELINE_MODELS.map((colModel) => {
-        if (colModel === rowModel) {
-          return <div key={colModel} className="aspect-square rounded bg-neutral-100 dark:bg-neutral-900" />;
-        }
-        const k = byPair.get(`${rowModel}\u0000${colModel}`);
-        if (k === undefined) {
-          return (
-            <div
-              key={colModel}
-              className="aspect-square rounded border border-dashed border-neutral-200 dark:border-neutral-800"
-            />
-          );
-        }
-        const style = STATUS_STYLE[kappaTier(k)];
-        return (
-          <div
-            key={colModel}
-            title={`${kappaLabel(k)} (κ=${k.toFixed(3)})`}
-            style={{ background: style.bg, color: style.fg }}
-            className="flex aspect-square items-center justify-center rounded font-mono text-[10px] font-semibold tabular-nums"
-          >
-            {k.toFixed(2)}
+        <>
+          <Heatmap
+            rows={nodes}
+            cols={nodes}
+            cell={cell}
+            skip={(a, b) => order.indexOf(a as (typeof order)[number]) >= order.indexOf(b as (typeof order)[number])}
+            rowHeaderWidth={64}
+            minColWidth={48}
+          />
+          <div className="mt-2">
+            <HeatmapLegend lowLabel="0" highLabel="1" caption="κ" />
           </div>
-        );
-      })}
-    </>
+        </>
+      )}
+    </motion.div>
   );
 }
