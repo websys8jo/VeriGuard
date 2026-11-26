@@ -1,0 +1,13 @@
+source,split,model_a,model_b,kappa,n
+dna,test,llama_guard_3_1b,qwen3guard_gen_0_6b,0.2527905814405509,1170
+dna,test,llama_guard_3_1b,shieldgemma_2b,0.34564761043776715,1170
+dna,test,llama_guard_3_1b,team_shieldgemma_2b,0.3093510191326089,1170
+dna,test,qwen3guard_gen_0_6b,shieldgemma_2b,0.48764266360128083,1170
+dna,test,qwen3guard_gen_0_6b,team_shieldgemma_2b,0.6457954909712575,1170
+dna,test,shieldgemma_2b,team_shieldgemma_2b,0.7534154868463465,1170
+jigsaw,test,llama_guard_3_1b,qwen3guard_gen_0_6b,0.0,410
+jigsaw,test,llama_guard_3_1b,shieldgemma_2b,0.0,410
+jigsaw,test,llama_guard_3_1b,team_shieldgemma_2b,0.0,410
+jigsaw,test,qwen3guard_gen_0_6b,shieldgemma_2b,-0.02994577923692976,410
+jigsaw,test,qwen3guard_gen_0_6b,team_shieldgemma_2b,0.04289316655431552,410
+jigsaw,test,shieldgemma_2b,team_shieldgemma_2b,0.7715530341404113,410
