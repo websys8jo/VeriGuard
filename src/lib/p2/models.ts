@@ -15,6 +15,13 @@ export const MODEL_LABELS: Record<ModelName, string> = {
   team_judge: "팀 판정기",
 };
 
+export const MODEL_SHORT_LABELS: Record<ModelName, string> = {
+  llama_guard_3_1b: "Llama Guard",
+  qwen3guard_gen_0_6b: "Qwen3Guard",
+  shieldgemma_2b: "ShieldGemma",
+  team_judge: "팀 판정기",
+};
+
 // Which (model_name, condition) row represents "this model's call" for a text.
 // llama_guard/qwen3guard aren't rule-conditioned (rule_id is null, one row per
 // text). shieldgemma/team_judge take a rule sentence as input, so we pick the
