@@ -34,3 +34,9 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+### Jigsaw B 예시 구성
+
+광고 금지와 법률 조언 금지 규칙별로, 원본 데이터에 포함된 dev 예시에서 정상 2건과 위반 2건을 골랐습니다. 각 규칙의 정상·위반 사례를 같은 수로 제시하고 test 데이터는 최종 평가에만 사용하기 위해 이 방식을 선택했습니다.
+
+예시에 사용한 8건의 `text_id`는 `b_example_dev_ids.csv`에 기록했습니다. 예시와 평가 데이터가 겹치지 않도록 8건을 A·B·C에서 공통으로 제외하고, 나머지 dev 1,611건으로 비교합니다.
